@@ -136,6 +136,7 @@ r1 = re.compile('<style[^<]*?<[^<]*?MediaWiki:Geshi\.css[^<]*?<\/style>', re.MUL
 
 # fix links to files in rename_map
 rlink = re.compile('((?:src|href)=")([^"]*)(")')
+rscheme = re.compile('((?:ht|f)tps?)%3A//')
 
 def rlink_fix(match):
     pre = match.group(1)
@@ -151,7 +152,8 @@ def rlink_fix(match):
     target = re.sub('(\.php|\.css)\?.*', '\\1', target)
     target = urllib.parse.quote(target)
     target = xml_escape(target)
-    target = target.replace('%23', '#');
+    target = target.replace('%23', '#')
+    target = rscheme.sub('\\1://', target)
     return pre + target + post
 
 # clean the html files
