@@ -24,6 +24,7 @@ import sys
 import shutil
 import urllib.parse
 from xml_utils import xml_escape, xml_unescape
+from multiprocessing import Pool
 
 # copy the source tree
 os.system('rm -rf output/reference')
@@ -157,7 +158,8 @@ def rlink_fix(match):
     return pre + target + post
 
 # clean the html files
-for fn in html_files:
+
+def clean_file(fn):
     f = open(fn, "r")
     text = f.read()
     f.close()
@@ -173,8 +175,11 @@ for fn in html_files:
     ret = os.system('xsltproc --novalid --html --encoding UTF-8 preprocess.xsl "' + fn + '" > "' + tmpfile + '"')
     if ret != 0:
         print("FAIL: " + fn)
-        continue
-    os.system('mv "' + tmpfile + '" "' + fn + '"')
+    else:
+        os.system('mv "' + tmpfile + '" "' + fn + '"')
+
+with Pool() as pool:
+    pool.map(clean_file, html_files)
 
 # append css modifications
 
