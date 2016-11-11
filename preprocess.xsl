@@ -39,42 +39,6 @@
   <xsl:template match="//*[contains(@class, ' noprint')]"/>
   <xsl:template match="//*[@class='noprint']"/>
 
-  <!-- remove 'See also' links between C and C++ parts of the documentation -->
-  <xsl:template match="
-    //tr[
-      @class = 't-dcl-list-item'
-      and .//td/div[
-        @class = 't-dcl-list-see'
-      ]
-    ]"/>
-
-  <xsl:template match="
-    //tr[
-      ./td[
-        @class = 't-dcl-list-sep'
-      ]
-      and following-sibling::tr[1][
-        @class = 't-dcl-list-item'
-        and .//td/div[
-          @class = 't-dcl-list-see'
-        ]
-      ]
-    ]"/>
-
-  <xsl:template match="
-    //h3[
-      .//span[
-        @id = 'See_also'
-      ]
-      and following-sibling::table[1][
-        @class = 't-dcl-list-begin'
-        and (count(./tr) = 2 or count(./tbody/tr) = 2)
-        and .//td/div [
-          @class = 't-dcl-list-see'
-        ]
-      ]
-    ]"/>
-
   <!-- remove external links to unused resources -->
   <xsl:template match="/html/head/link[@rel = 'alternate']"/>
   <xsl:template match="/html/head/link[@rel = 'search']"/>
