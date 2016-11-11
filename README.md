@@ -46,3 +46,17 @@ See also
 
 Debian packaging information for this package is maintained at
 <https://github.com/p12tic/cppreference-doc-debian>
+
+About this fork
+---------------
+
+I made this fork mainly because the last official version of the offline package
+was rather old and much had changed with new C++ versions. Now I try to update
+roughly once a month.
+
+Additional changes from upstream are:
+
+ * Better layout by centering the content on the page.
+ * A fix for external links which don't work in the original.
+ * Keeping links between the C and C++ parts of the documentation.
+ * Parallel build.
