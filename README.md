@@ -57,6 +57,4 @@ roughly once a month.
 Additional changes from upstream are:
 
  * Better layout by centering the content on the page.
- * A fix for external links which don't work in the original.
  * Keeping links between the C and C++ parts of the documentation.
- * Parallel build.
