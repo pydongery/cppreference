@@ -17,183 +17,197 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program.  If not, see http://www.gnu.org/licenses/.
 
+import argparse
 import fnmatch
+from lxml import etree
 import re
 import os
 import sys
 import shutil
 import urllib.parse
 from xml_utils import xml_escape, xml_unescape
-from multiprocessing import Pool
 
-# copy the source tree
-os.system('rm -rf output/reference')
-os.system('mkdir -p output/reference')
-os.system('cp -r reference/* output/reference ')
+def rmtree_if_exists(dir):
+    if os.path.isdir(dir):
+        shutil.rmtree(dir)
 
-# rearrange the archive {root} here is output/reference
+def move_dir_contents_to_dir(srcdir, dstdir):
+    for fn in os.listdir(srcdir):
+        shutil.move(os.path.join(srcdir, fn),
+                    os.path.join(dstdir, fn))
 
-# before
-# {root}/en.cppreference.com/w/ : html
-# {root}/en.cppreference.com/mwiki/ : data
-# {root}/en.cppreference.com/ : data
-# ... (other languages)
-# {root}/upload.cppreference.com/mwiki/ : data
+def rearrange_archive(root):
+    # rearrange the archive. {root} here is output/reference
 
-# after
-# {root}/common/ : all common data
-# {root}/en/ : html for en
-# ... (other languages)
+    # before
+    # {root}/en.cppreference.com/w/ : html
+    # {root}/en.cppreference.com/mwiki/ : data
+    # {root}/en.cppreference.com/ : data
+    # ... (other languages)
+    # {root}/upload.cppreference.com/mwiki/ : data
 
-data_path = "output/reference/common"
-os.system('mkdir ' + data_path)
-os.system('mv output/reference/upload.cppreference.com/mwiki/* ' + data_path)
-os.system('rm -r output/reference/upload.cppreference.com/')
+    # after
+    # {root}/common/ : all common data
+    # {root}/en/ : html for en
+    # ... (other languages)
 
-for lang in ["en"]:
-    path = "output/reference/" + lang + ".cppreference.com/"
-    src_html_path = path + "w/"
-    src_data_path = path + "mwiki/"
-    html_path = "output/reference/" + lang
+    data_path = os.path.join(root, 'common')
+    rmtree_if_exists(data_path)
+    shutil.move(os.path.join(root, 'upload.cppreference.com/mwiki'), data_path)
+    shutil.rmtree(os.path.join(root, 'upload.cppreference.com'))
 
-    if (os.path.isdir(src_html_path)):
-        os.system('mv ' + src_html_path + ' ' + html_path)
+    for lang in ["en"]:
+        path = os.path.join(root, lang + ".cppreference.com/")
+        src_html_path = path + "w/"
+        src_data_path = path + "mwiki/"
+        html_path = os.path.join(root, lang)
 
-    if (os.path.isdir(src_data_path)):
-        # the skin files should be the same for all languages thus we
-        # can merge everything
-        os.system('cp -r ' + src_data_path + '/* ' + data_path)
-        os.system('rm -r ' + src_data_path)
+        if os.path.isdir(src_html_path):
+            shutil.move(src_html_path, html_path)
 
-    # also copy the custom fonts
-    os.system('cp ' + path + 'DejaVuSansMonoCondensed60.ttf ' +
-                      path + 'DejaVuSansMonoCondensed75.ttf ' + data_path)
-    # remove what's left
-    os.system('rm -r '+ path)
+        if os.path.isdir(src_data_path):
+            # the skin files should be the same for all languages thus we
+            # can merge everything
+            move_dir_contents_to_dir(src_data_path, data_path)
 
+        # also copy the custom fonts
+        shutil.copy(os.path.join(path, 'DejaVuSansMonoCondensed60.ttf'), data_path)
+        shutil.copy(os.path.join(path, 'DejaVuSansMonoCondensed75.ttf'), data_path)
 
-# find files that need to be renamed
-files_rename_qs = []        # remove query string
-files_rename_quot = []      # remove quotes
-files_loader = []           # files served by load.php
-for root, dirnames, filenames in os.walk('output/reference/'):
-    for filename in fnmatch.filter(filenames, '*[?]*'):
-        files_rename_qs.append((root, filename))
-    for filename in fnmatch.filter(filenames, '*"*'):
-        files_rename_quot.append((root, filename))
-    for filename in fnmatch.filter(filenames, 'load.php[?]*'):
-        files_loader.append((root, filename))
+        # remove what's left
+        shutil.rmtree(path)
 
-for root,fn in files_loader:
-    files_rename_qs.remove((root,fn))
-
-# strip query strings from filenames to support Windows filesystems
-rename_map = []
-def rename_file(root, fn, new_fn):
-    path = os.path.join(root,fn)
+# strip query strings from filenames to support Windows filesystems.
+def add_file_to_rename_map(rename_map, dir, fn, new_fn):
+    path = os.path.join(dir, fn)
     if not os.path.isfile(path):
         print("Not renaming " + path)
         return
-    new_path = os.path.join(root,new_fn)
-    shutil.move(path, new_path)
-    rename_map.append((fn, new_fn))
+    rename_map.append((dir, fn, new_fn))
 
-for root,fn in files_rename_qs:
-    rename_file(root, fn, re.sub('\?.*', '', fn))
-for root,fn in files_rename_quot:
-    rename_file(root, fn, re.sub('"', '_q_', fn))
+def find_files_to_be_renamed(root):
+    # returns a rename map: array of tuples each of which contain three strings:
+    # the directory the file resides in, the source and destination filenames
+    rename_map = []
 
-# map loader names to more recognizable names
-for root,fn in files_loader:
-    if re.search("modules=site&only=scripts", fn):
-        new_fn = "site_scripts.js"
-    elif re.search("modules=site&only=styles", fn):
-        new_fn = "site_modules.css"
-    elif re.search("modules=skins.*&only=scripts", fn):
-        new_fn = "skin_scripts.js"
-    elif re.search("modules=startup&only=scripts", fn):
-        new_fn = "startup_scripts.js"
-    elif re.search("modules=.*ext.*&only=styles", fn):
-        new_fn = "ext.css"
-    else:
-        print("Loader file " + fn + " does not match any known files")
-        sys.exit(1)
+    files_rename_qs = []        # remove query string
+    files_rename_quot = []      # remove quotes
+    files_loader = []           # files served by load.php
+    for dir, dirnames, filenames in os.walk(root):
+        for filename in fnmatch.filter(filenames, '*[?]*'):
+            files_rename_qs.append((dir, filename))
+        for filename in fnmatch.filter(filenames, '*"*'):
+            files_rename_quot.append((dir, filename))
+        for filename in fnmatch.filter(filenames, 'load.php[?]*'):
+            files_loader.append((dir, filename))
 
-    rename_file(root, fn, new_fn)
+    for dir,fn in files_loader:
+        files_rename_qs.remove((dir, fn))
 
-# rename filenames that conflict on case-insensitive filesystems
-# TODO: perform this automatically
-rename_file('output/reference/en/cpp/numeric/math', 'NAN.html', 'NAN.2.html')
-rename_file('output/reference/en/c/numeric/math', 'NAN.html', 'NAN.2.html')
+    for dir,fn in files_rename_qs:
+        add_file_to_rename_map(rename_map, dir, fn, re.sub('\?.*', '', fn))
+    for dir,fn in files_rename_quot:
+        add_file_to_rename_map(rename_map, dir, fn, re.sub('"', '_q_', fn))
 
-# find files that need to be preprocessed
-html_files = []
-for root, dirnames, filenames in os.walk('output/reference/'):
-    for filename in fnmatch.filter(filenames, '*.html'):
-        html_files.append(os.path.join(root, filename))
+    # map loader names to more recognizable names
+    for dir,fn in files_loader:
+        if re.search("modules=site&only=scripts", fn):
+            new_fn = "site_scripts.js"
+        elif re.search("modules=site&only=styles", fn):
+            new_fn = "site_modules.css"
+        elif re.search("modules=skins.*&only=scripts", fn):
+            new_fn = "skin_scripts.js"
+        elif re.search("modules=startup&only=scripts", fn):
+            new_fn = "startup_scripts.js"
+        elif re.search("modules=.*ext.*&only=styles", fn):
+            new_fn = "ext.css"
+        else:
+            print("Loader file " + fn + " does not match any known files")
+            sys.exit(1)
 
-#temporary fix
-r1 = re.compile('<style[^<]*?<[^<]*?MediaWiki:Geshi\.css[^<]*?<\/style>', re.MULTILINE)
+        add_file_to_rename_map(rename_map, dir, fn, new_fn)
 
-# fix links to files in rename_map
-rlink = re.compile('((?:src|href)=")([^"]*)(")')
-rscheme = re.compile('((?:ht|f)tps?)%3A//')
+    # rename filenames that conflict on case-insensitive filesystems
+    # TODO: perform this automatically
+    add_file_to_rename_map(rename_map, os.path.join(root, 'en/cpp/numeric/math'), 'NAN.html', 'NAN.2.html')
+    add_file_to_rename_map(rename_map, os.path.join(root, 'en/c/numeric/math'), 'NAN.html', 'NAN.2.html')
+    return rename_map
 
-def rlink_fix(match):
-    pre = match.group(1)
-    target = match.group(2)
-    post = match.group(3)
+def rename_files(rename_map):
+    for dir, old_fn, new_fn in rename_map:
+        shutil.move(os.path.join(dir, old_fn), os.path.join(dir, new_fn))
 
-    target = xml_unescape(target)
+def find_html_files(root):
+    # find files that need to be preprocessed
+    html_files = []
+    for dir, dirnames, filenames in os.walk(root):
+        for filename in fnmatch.filter(filenames, '*.html'):
+            html_files.append(os.path.join(dir, filename))
+    return html_files
+
+def fix_relative_link(rename_map, target):
+    if 'http://' in target or 'https://' in target:
+        return target
+
     target = urllib.parse.unquote(target)
-    for fn,new_fn in rename_map:
+    for dir,fn,new_fn in rename_map:
         target = target.replace(fn, new_fn)
     target = target.replace('../../upload.cppreference.com/mwiki/','../common/')
     target = target.replace('../mwiki/','../common/')
     target = re.sub('(\.php|\.css)\?.*', '\\1', target)
     target = urllib.parse.quote(target)
-    target = xml_escape(target)
     target = target.replace('%23', '#')
-    target = rscheme.sub('\\1://', target)
-    return pre + target + post
+    return target
 
-# clean the html files
+def has_class(el, classes_to_check):
+    value = el.get('class')
+    if value is None:
+        return False
+    classes = value.split(' ')
+    for cl in classes_to_check:
+        if cl in classes:
+            return True
+    return False
 
-def clean_file(fn):
-    f = open(fn, "r")
-    text = f.read()
-    f.close()
+def preprocess_html_file(root, fn, rename_map):
+    parser = etree.HTMLParser()
+    html = etree.parse(fn, parser)
 
-    text = r1.sub('', text);
-    text = rlink.sub(rlink_fix, text)
+    # remove non-printable elements
+    for el in html.xpath('//*'):
+        if has_class(el, ['noprint', 'editsection']):
+            el.getparent().remove(el)
+        if el.get('id') == 'toc':
+            el.getparent().remove(el)
+
+    # remove external links to unused resources
+    for el in html.xpath('/html/head/link'):
+        if el.get('rel') in [ 'alternate', 'search', 'edit', 'EditURI' ]:
+            el.getparent().remove(el)
+
+    # remove Google Analytics scripts
+    for el in html.xpath('/html/body/script'):
+        if el.get('src') is not None and 'google-analytics.com/ga.js' in el.get('src'):
+            el.getparent().remove(el)
+        elif el.text is not None and ('google-analytics.com/ga.js' in el.text or 'pageTracker' in el.text):
+            el.getparent().remove(el)
+
+    # apply changes to links caused by file renames
+    for el in html.xpath('//*[@src or @href]'):
+        if el.get('src') is not None:
+            el.set('src', fix_relative_link(rename_map, el.get('src')))
+        elif el.get('href') is not None:
+            el.set('href', fix_relative_link(rename_map, el.get('href')))
+
+    for err in parser.error_log:
+        print("HTML WARN: {0}".format(err))
+    text = etree.tostring(html, encoding=str, method="html")
 
     f = open(fn, "w")
     f.write(text)
     f.close()
 
-    tmpfile = fn + '.tmp';
-    ret = os.system('xsltproc --novalid --html --encoding UTF-8 preprocess.xsl "' + fn + '" > "' + tmpfile + '"')
-    if ret != 0:
-        print("FAIL: " + fn)
-    else:
-        os.system('mv "' + tmpfile + '" "' + fn + '"')
-
-with Pool() as pool:
-    pool.map(clean_file, html_files)
-
-# append css modifications
-
-f = open("preprocess-css.css", "r")
-css_app = f.read()
-f.close()
-f = open("output/reference/common/site_modules.css", "a")
-f.write(css_app)
-f.close()
-
-# fix css files
-
-for fn in [ "output/reference/common/site_modules.css",
-            "output/reference/common/ext.css"]:
+def preprocess_css_file(fn):
     f = open(fn, "r")
     text = f.read()
     f.close()
@@ -210,3 +224,43 @@ for fn in [ "output/reference/common/site_modules.css",
     f.write(text)
     f.close()
 
+def main():
+    parser = argparse.ArgumentParser(prog='preprocess.py')
+    parser.add_argument('--src', type=str, help='Source directory where raw website copy resides')
+    parser.add_argument('--dst', type=str, help='Destination folder to put preprocessed archive to')
+    args = parser.parse_args()
+
+    root = args.dst
+    src = args.src
+
+    # copy the source tree
+    rmtree_if_exists(root)
+    shutil.copytree(src, root)
+
+    rearrange_archive(root)
+
+    rename_map = find_files_to_be_renamed(root)
+    rename_files(rename_map)
+
+    # clean the html files
+    for fn in find_html_files(root):
+        preprocess_html_file(root, fn, rename_map)
+
+    # append css modifications
+
+    f = open("preprocess-css.css", "r")
+    css_app = f.read()
+    f.close()
+    f = open(os.path.join(root, 'common/site_modules.css'), "a")
+    f.write(css_app)
+    f.close()
+
+    # clean the css files
+
+    for fn in [ os.path.join(root, 'common/site_modules.css'),
+                os.path.join(root, 'common/ext.css') ]:
+        preprocess_css_file(fn)
+
+
+if __name__ == "__main__":
+    main()

@@ -58,7 +58,6 @@ DISTFILES=	\
 		index-functions-cpp.xml	\
 		link_map.py		\
 		preprocess.py			\
-		preprocess.xsl			\
 		preprocess-css.css		\
 		Makefile				\
 		README.md			\
@@ -191,6 +190,7 @@ output/cppreference-doxygen-local.tag.xml: 		\
 		output/link-map.xml
 	./index2doxygen-tag.py "output/link-map.xml" \
 		"index-functions-cpp.xml" \
+		"index-chapters-cpp.xml" \
 		"output/cppreference-doxygen-local.tag.xml"
 
 output/cppreference-doxygen-web.tag.xml: 		\
@@ -198,12 +198,13 @@ output/cppreference-doxygen-web.tag.xml: 		\
 		output/link-map.xml
 	./index2doxygen-tag.py web \
 		"index-functions-cpp.xml" \
+		"index-chapters-cpp.xml" \
 		"output/cppreference-doxygen-web.tag.xml"
 
 #create preprocessed archive
 output/reference:
 	mkdir -p output
-	./preprocess.py
+	./preprocess.py --src reference --dst output/reference
 
 # create indexes for the wiki
 indexes:
