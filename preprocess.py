@@ -146,7 +146,7 @@ def find_html_files(root):
     return html_files
 
 def fix_relative_link(rename_map, target):
-    if 'http://' in target or 'https://' in target:
+    if re.match('(ht|f)tps?://', target):
         return target
 
     target = urllib.parse.unquote(target)
