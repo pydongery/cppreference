@@ -175,7 +175,7 @@ def preprocess_html_file(root, fn, rename_map):
 
     # remove non-printable elements
     for el in html.xpath('//*'):
-        if has_class(el, ['noprint', 'editsection']):
+        if has_class(el, ['noprint', 'editsection']) and el.get('id') != 'cpp-footer-base':
             el.getparent().remove(el)
         if el.get('id') == 'toc':
             el.getparent().remove(el)
@@ -191,6 +191,22 @@ def preprocess_html_file(root, fn, rename_map):
             el.getparent().remove(el)
         elif el.text is not None and ('google-analytics.com/ga.js' in el.text or 'pageTracker' in el.text):
             el.getparent().remove(el)
+
+    # make custom footer
+    footer = html.xpath('//*[@id=\'footer\']')[0]
+    for child in footer.getchildren():
+        id = child.get('id')
+        if id == 'cpp-navigation':
+            items = child.find('ul')
+            items.clear()
+            link = etree.SubElement(etree.SubElement(items, 'li'), 'a')
+            url = re.sub('(..)/(.*)\\.html', 'http://\\1.cppreference.com/w/\\2', os.path.relpath(fn, root))
+            link.set('href', url)
+            link.text = 'Online version'
+        elif id == 'footer-info':
+            pass
+        else:
+            footer.remove(child)
 
     # apply changes to links caused by file renames
     for el in html.xpath('//*[@src or @href]'):
