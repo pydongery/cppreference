@@ -18,6 +18,7 @@
 #   along with this program.  If not, see http://www.gnu.org/licenses/.
 
 import argparse
+from datetime import datetime
 import fnmatch
 from lxml import etree
 import re
@@ -199,10 +200,15 @@ def preprocess_html_file(root, fn, rename_map):
         if id == 'cpp-navigation':
             items = child.find('ul')
             items.clear()
+
             link = etree.SubElement(etree.SubElement(items, 'li'), 'a')
             url = re.sub('(..)/(.*)\\.html', 'http://\\1.cppreference.com/w/\\2', os.path.relpath(fn, root))
             link.set('href', url)
             link.text = 'Online version'
+
+            li = etree.SubElement(items, 'li')
+            mtime = datetime.fromtimestamp(os.stat(fn).st_mtime);
+            li.text = f"Offline version retrieved {mtime.isoformat(sep=' ', timespec='minutes')}."
         elif id == 'footer-info':
             pass
         else:
