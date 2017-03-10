@@ -58,3 +58,4 @@ Additional changes from upstream are:
 
  * Better layout by centering the content on the page.
  * Keeping links between the C and C++ parts of the documentation.
+ * Keep a footer with a link to the online version of each page.
