@@ -74,6 +74,8 @@ def rearrange_archive(root):
         # also copy the custom fonts
         shutil.copy(os.path.join(path, 'DejaVuSansMonoCondensed60.ttf'), data_path)
         shutil.copy(os.path.join(path, 'DejaVuSansMonoCondensed75.ttf'), data_path)
+        # and the favicon
+        shutil.copy(os.path.join(path, 'favicon.ico'), data_path)
 
         # remove what's left
         shutil.rmtree(path)
@@ -185,6 +187,9 @@ def preprocess_html_file(root, fn, rename_map):
     for el in html.xpath('/html/head/link'):
         if el.get('rel') in [ 'alternate', 'search', 'edit', 'EditURI' ]:
             el.getparent().remove(el)
+        elif el.get('rel') == 'shortcut icon':
+            (head, tail) = os.path.split(el.get('href'))
+            el.set('href', os.path.join(head, 'common', tail))
 
     # remove Google Analytics scripts
     for el in html.xpath('/html/body/script'):
