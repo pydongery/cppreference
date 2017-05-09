@@ -16,7 +16,16 @@
 #ifndef CPPREFERENCE_MAP_H
 #define CPPREFERENCE_MAP_H
 
+#if CPPREFERENCE_STDVER >= 2011
+#include <initializer_list>
+#endif
+
 namespace std {
+
+#include <cstddef> // for size_t, ptrdiff_t
+#include <iterator> // for std::reverse_iterator
+#include <memory> // for std::allocator
+#include <utility> // for std::pair
 
 template <
     class Key,
@@ -39,18 +48,18 @@ public:
     typedef value_type* pointer;
     typedef const value_type* const_pointer;
 #elif CPPREFERENCE_STDVER <2011
-    typedef Allocator::reference reference;
-    typedef Allocator::const_reference const_reference;
-    typedef Allocator::pointer pointer;
-    typedef Allocator::const_pointer const_pointer;
+    typedef typename Allocator::reference reference;
+    typedef typename Allocator::const_reference const_reference;
+    typedef typename Allocator::pointer pointer;
+    typedef typename Allocator::const_pointer const_pointer;
 #else
     typedef value_type& reference;
     typedef const value_type& const_reference;
-    typedef std::allocator_traits<Allocator>::pointer pointer;
-    typedef std::allocator_traits<Allocator>::const_pointer const_pointer;
+    typedef typename std::allocator_traits<Allocator>::pointer pointer;
+    typedef typename std::allocator_traits<Allocator>::const_pointer const_pointer;
 #endif
-    typedef T* iterator; // actual type is unspecified
-    typedef const T* const_iterator; // actual type is unspecified
+    typedef value_type* iterator; // actual type is unspecified
+    typedef const value_type* const_iterator; // actual type is unspecified
     typedef std::reverse_iterator<iterator> reverse_iterator;
     typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
 
@@ -99,7 +108,7 @@ public:
 
 #if CPPREFERENCE_STDVER>= 2011
     map(map&& other);
-    map(const map&& other, const Allocator& alloc);
+    map(map&& other, const Allocator& alloc);
 
     map(std::initializer_list<value_type> init,
         const Compare& comp = Compare(),
@@ -296,15 +305,15 @@ public:
     typedef value_type* pointer;
     typedef const value_type* const_pointer;
 #elif CPPREFERENCE_STDVER <2011
-    typedef Allocator::reference reference;
-    typedef Allocator::const_reference const_reference;
-    typedef Allocator::pointer pointer;
-    typedef Allocator::const_pointer const_pointer;
+    typedef typename Allocator::reference reference;
+    typedef typename Allocator::const_reference const_reference;
+    typedef typename Allocator::pointer pointer;
+    typedef typename Allocator::const_pointer const_pointer;
 #else
     typedef value_type& reference;
     typedef const value_type& const_reference;
-    typedef std::allocator_traits<Allocator>::pointer pointer;
-    typedef std::allocator_traits<Allocator>::const_pointer const_pointer;
+    typedef typename std::allocator_traits<Allocator>::pointer pointer;
+    typedef typename std::allocator_traits<Allocator>::const_pointer const_pointer;
 #endif
     typedef T* iterator; // actual type is unspecified
     typedef const T* const_iterator; // actual type is unspecified
@@ -356,7 +365,7 @@ public:
 
 #if CPPREFERENCE_STDVER>= 2011
     multimap(multimap&& other);
-    multimap(const multimap&& other, const Allocator& alloc);
+    multimap(multimap&& other, const Allocator& alloc);
 
     multimap(std::initializer_list<value_type> init,
              const Compare& comp = Compare(),

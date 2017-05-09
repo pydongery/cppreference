@@ -19,6 +19,11 @@
 #if CPPREFERENCE_STDVER>= 2011
 #include <initializer_list>
 
+#include <cstddef> // for size_t, ptrdiff_t
+#include <iterator> // for std::reverse_iterator
+#include <memory> // for std::allocator
+#include <utility> // for std::pair
+
 namespace std {
 
 template <
@@ -43,13 +48,13 @@ public:
     typedef value_type* pointer;
     typedef const value_type* const_pointer;
 #else
-    typedef std::allocator_traits<Allocator>::pointer pointer;
-    typedef std::allocator_traits<Allocator>::const_pointer const_pointer;
+    typedef typename std::allocator_traits<Allocator>::pointer pointer;
+    typedef typename std::allocator_traits<Allocator>::const_pointer const_pointer;
 #endif
-    typedef T* iterator; // actual type is unspecified
-    typedef const T* const_iterator; // actual type is unspecified
-    typedef T* local_iterator; // actual type is unspecified
-    typedef const T* const_local_iterator; // actual type is unspecified
+    typedef value_type* iterator; // actual type is unspecified
+    typedef const value_type* const_iterator; // actual type is unspecified
+    typedef value_type* local_iterator; // actual type is unspecified
+    typedef const value_type* const_local_iterator; // actual type is unspecified
 
     // constructor
     // constructor
@@ -253,8 +258,8 @@ public:
     typedef value_type* pointer;
     typedef const value_type* const_pointer;
 #else
-    typedef std::allocator_traits<Allocator>::pointer pointer;
-    typedef std::allocator_traits<Allocator>::const_pointer const_pointer;
+    typedef typename std::allocator_traits<Allocator>::pointer pointer;
+    typedef typename std::allocator_traits<Allocator>::const_pointer const_pointer;
 #endif
     typedef T* iterator; // actual type is unspecified
     typedef const T* const_iterator; // actual type is unspecified
