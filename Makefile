@@ -110,13 +110,13 @@ release: all
 	# zip the distributable
 	mkdir -p "cppreference-doc-$(VERSION)"
 	cp -r $(DISTFILES) "cppreference-doc-$(VERSION)"
-	tar czf "release/cppreference-doc-$(VERSION).tar.gz" "cppreference-doc-$(VERSION)"
+	tar cJf "release/cppreference-doc-$(VERSION).tar.xz" "cppreference-doc-$(VERSION)"
 	zip -qr "release/cppreference-doc-$(VERSION).zip" "cppreference-doc-$(VERSION)"
 	rm -rf "cppreference-doc-$(VERSION)"
 
 	# zip the html output
 	pushd "output"; \
-	tar czf "../release/html-book-$(VERSION).tar.gz" "reference" \
+	tar cJf "../release/html-book-$(VERSION).tar.xz" "reference" \
 		"cppreference-doxygen-local.tag.xml" ; \
 	zip -qr "../release/html-book-$(VERSION).zip" "reference" \
 		"cppreference-doxygen-local.tag.xml" ; \
