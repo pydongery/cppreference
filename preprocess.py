@@ -244,7 +244,7 @@ def preprocess_html_file(root, fn, rename_map):
     for err in parser.error_log:
         print("HTML WARN: {0}".format(err))
 
-    html.write(fn, encoding='UTF-8', method='html')
+    html.write(fn, encoding='utf-8', method='html')
 
 def preprocess_css_file(fn):
     f = open(fn, "r", encoding='utf-8')

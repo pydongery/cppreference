@@ -42,7 +42,7 @@ DISTFILES=	\
 		skins/					\
 		build_link_map.py		\
 		ddg_parse_html.py		\
-		devhelp2qch.xsl			\
+		devhelp2qch.py			\
 		fix_devhelp-links.py	\
 		index2autolinker.py	\
 		index2browser.py		\
@@ -68,6 +68,14 @@ DISTFILES=	\
 CLEANFILES= \
 		output
 
+TAR_FORMAT := gz
+TAR_OPTION := z
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Linux)
+	TAR_FORMAT := xz
+	TAR_OPTION := J
+endif
+
 clean:
 		rm -rf $(CLEANFILES)
 
@@ -76,7 +84,7 @@ check:
 dist: clean
 	mkdir -p "cppreference-doc-$(VERSION)"
 	cp -r $(DISTFILES) "cppreference-doc-$(VERSION)"
-	tar czf "cppreference-doc-$(VERSION).tar.gz" "cppreference-doc-$(VERSION)"
+	tar c$(TAR_OPTION)f "cppreference-doc-$(VERSION).tar.$(TAR_FORMAT)" "cppreference-doc-$(VERSION)"
 	rm -rf "cppreference-doc-$(VERSION)"
 
 install: all
@@ -110,13 +118,13 @@ release: all
 	# zip the distributable
 	mkdir -p "cppreference-doc-$(VERSION)"
 	cp -r $(DISTFILES) "cppreference-doc-$(VERSION)"
-	tar cJf "release/cppreference-doc-$(VERSION).tar.xz" "cppreference-doc-$(VERSION)"
+	tar c$(TAR_OPTION)f "release/cppreference-doc-$(VERSION).tar.$(TAR_FORMAT)" "cppreference-doc-$(VERSION)"
 	zip -qr "release/cppreference-doc-$(VERSION).zip" "cppreference-doc-$(VERSION)"
 	rm -rf "cppreference-doc-$(VERSION)"
 
 	# zip the html output
 	pushd "output"; \
-	tar cJf "../release/html-book-$(VERSION).tar.xz" "reference" \
+	tar c$(TAR_OPTION)f "../release/html-book-$(VERSION).tar.$(TAR_FORMAT)" "reference" \
 		"cppreference-doxygen-local.tag.xml" ; \
 	zip -qr "../release/html-book-$(VERSION).zip" "reference" \
 		"cppreference-doxygen-local.tag.xml" ; \
@@ -124,7 +132,7 @@ release: all
 
 	# zip qch
 	pushd "output"; \
-	tar czf "../release/qch-book-$(VERSION).tar.gz" "cppreference-doc-en-cpp.qch"; \
+	tar c$(TAR_OPTION)f "../release/qch-book-$(VERSION).tar.$(TAR_FORMAT)" "cppreference-doc-en-cpp.qch"; \
 	zip -qr "../release/qch-book-$(VERSION).zip" "cppreference-doc-en-cpp.qch"; \
 	popd
 
@@ -183,8 +191,9 @@ output/qch-help-project-cpp.xml: output/cppreference-doc-en-cpp.devhelp2
 	echo "</files>" >> "output/qch-files.xml"
 
 	#create the project (copies the file list)
-	xsltproc devhelp2qch.xsl "output/cppreference-doc-en-cpp.devhelp2" > \
-		"output/qch-help-project-cpp.xml"
+	./devhelp2qch.py --src=output/cppreference-doc-en-cpp.devhelp2 \
+		--dst=output/qch-help-project-cpp.xml \
+		--virtual_folder=cpp --file_list=output/qch-files.xml
 
 # build doxygen tag file
 output/cppreference-doxygen-local.tag.xml: 		\
