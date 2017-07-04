@@ -223,6 +223,7 @@ def preprocess_html_file(root, fn, rename_map):
 
             link = etree.SubElement(etree.SubElement(items, 'li'), 'a')
             url = re.sub('(..)/(.*)\\.html', 'http://\\1.cppreference.com/w/\\2', os.path.relpath(fn, root))
+            url = re.sub('(.*)/index', '\\1/', url)
             link.set('href', url)
             link.text = 'Online version'
 
