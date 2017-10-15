@@ -71,8 +71,25 @@ $(function() {
     // Standard revision identification 'enums'. Thoughout the plugin it is
     // assumed that the values are integers starting at zero and thus they can
     // be used as an index in regular arrays.
-    var Rev_c = { DIFF: 0, FIRST: 1, C89: 1, C99: 2, C11: 3, LAST: 4 };
-    var Rev_cxx = { DIFF: 0, FIRST: 1, CXX98: 1, CXX11: 2, CXX14: 3, CXX17: 4, LAST: 5 };
+    var Rev_c = {
+        DIFF: 0,
+        FIRST: 1,
+        C89: 1,
+        C99: 2,
+        C11: 3,
+        LAST: 4
+    };
+    var Rev_cxx = {
+        DIFF: 0,
+        FIRST: 1,
+        CXX98: 1,
+        CXX03: 2,
+        CXX11: 3,
+        CXX14: 4,
+        CXX17: 5,
+        CXX20: 6,
+        LAST: 7,
+    };
 
     var Rev;
 
@@ -92,80 +109,35 @@ $(function() {
 
     var desc_cxx = [
         { rev: Rev.DIFF, title: 'Diff' },
-        { rev: Rev.CXX98, title: 'C++98/03' },
+        { rev: Rev.CXX03, title: 'C++98/03' },
         { rev: Rev.CXX11, title: 'C++11' },
         { rev: Rev.CXX14, title: 'C++14' },
         { rev: Rev.CXX17, title: 'C++17' },
+        { rev: Rev.CXX20, title: 'C++20' },
+    ];
+
+    var rev_css_classes_c = [
+        { rev: Rev.C99, since: 't-since-c99', until: 't-until-c99' },
+        { rev: Rev.C11, since: 't-since-c11', until: 't-until-c11' },
+    ];
+
+    var rev_css_classes_cxx = [
+        { rev: Rev.CXX03, since: 't-since-cxx03', until: 't-until-cxx03' },
+        { rev: Rev.CXX11, since: 't-since-cxx11', until: 't-until-cxx11' },
+        { rev: Rev.CXX14, since: 't-since-cxx14', until: 't-until-cxx14' },
+        { rev: Rev.CXX17, since: 't-since-cxx17', until: 't-until-cxx17' },
+        { rev: Rev.CXX20, since: 't-since-cxx20', until: 't-until-cxx20' },
     ];
 
     var desc;
+    var rev_css_classes;
 
     if (is_cxx) {   // select either C or C++ version
         desc = desc_cxx;
+        rev_css_classes = rev_css_classes_cxx;
     } else {
         desc = desc_c;
-    }
-
-    /** A 'mark identifier' is an object that specifies a half-open range of
-        standards. It contains the following fields:
-         'since' - a bool value identifying which half of the range is open.
-         'rev' - the revision of the standard. Rev.DIFF is not an accepted
-            value.
-    */
-
-    /*  Given a mark identifier and a revision, returns true if the range
-        specified by the mark identifier includes the revision in question
-    */
-    function should_be_shown(rev, mark) {
-        if (rev === Rev.DIFF) {
-            return true;
-        }
-        if (mark.since) {
-            return (rev >= mark.rev);
-        } else {
-            return (rev < mark.rev);
-        }
-    }
-
-    /*  Returns a mark identifier for a jQuery object. This function only
-        supports elements that may contain at most one mark css tag.
-    */
-    function get_mark_cxx(el) {
-        if (el.hasClass('t-since-cxx11')) {
-            return { since: true, rev: Rev.CXX11 };
-        }
-        if (el.hasClass('t-since-cxx14')) {
-            return { since: true, rev: Rev.CXX14 };
-        }
-        if (el.hasClass('t-since-cxx17')) {
-            return { since: true, rev: Rev.CXX17 };
-        }
-        if (el.hasClass('t-until-cxx11')) {
-            return { since: false, rev: Rev.CXX11 };
-        }
-        if (el.hasClass('t-until-cxx14')) {
-            return { since: false, rev: Rev.CXX14 };
-        }
-        if (el.hasClass('t-until-cxx17')) {
-            return { since: false, rev: Rev.CXX17 };
-        }
-        return { since: true, rev: Rev.CXX98 };
-    }
-
-    function get_mark_c(el) {
-        if (el.hasClass('t-since-c99')) {
-            return { since: true, rev: Rev.C99 };
-        }
-        if (el.hasClass('t-since-c11')) {
-            return { since: true, rev: Rev.C11 };
-        }
-        if (el.hasClass('t-until-c99')) {
-            return { since: false, rev: Rev.C99 };
-        }
-        if (el.hasClass('t-until-c11')) {
-            return { since: false, rev: Rev.C11 };
-        }
-        return { since: true, rev: Rev.C89 };
+        rev_css_classes = rev_css_classes_c;
     }
 
     /*  This class stores information about what revisions a certain object
@@ -215,6 +187,11 @@ $(function() {
     // Sets the visibility on the given revision to true.
     VisibilityMap.prototype.add = function(rev) {
         this.map[rev] = true;
+    }
+
+    // Sets the visibility on the given revision to true.
+    VisibilityMap.prototype.remove = function(rev) {
+        this.map[rev] = false;
     }
 
 
@@ -282,61 +259,24 @@ $(function() {
         visibility map corresponding to these css classes. Rev.DIFF is not
         included into the returned visibility map.
     */
-    // FIXME: this function handles only certain cases of fully closed ranges
-    function get_visibility_map_cxx(el) {
-        // DIFF: 0, CXX98: 1, CXX11: 2, CXX14: 3, CXX17: 4
-        if (el.hasClass('t-since-cxx17')) {
-            return new VisibilityMap([Rev.CXX17]);
-        }
-        if (el.hasClass('t-since-cxx14')) {
-            return new VisibilityMap([Rev.CXX14, Rev.CXX17]);
-        }
-        if (el.hasClass('t-since-cxx11')) {
-            if (el.hasClass('t-until-cxx14')) {
-                return new VisibilityMap([Rev.CXX11]);
+    function get_visibility_map(el) {
+        var map = new VisibilityMap();
+        for (var i = 0; i < rev_css_classes.length; i++) {
+            if (el.hasClass(rev_css_classes[i].since)) {
+                break;
             }
-            return new VisibilityMap([Rev.CXX11, Rev.CXX14, Rev.CXX17]);
         }
-        if (el.hasClass('t-until-cxx11')) {
-            return new VisibilityMap([Rev.CXX98]);
+        if (i === rev_css_classes.length) {
+            map.add(Rev.FIRST);
+            i = 0;
         }
-        if (el.hasClass('t-until-cxx14')) {
-            return new VisibilityMap([Rev.CXX98, Rev.CXX11]);
-        }
-        if (el.hasClass('t-until-cxx17')) {
-            return new VisibilityMap([Rev.CXX98, Rev.CXX11, Rev.CXX14]);
-        }
-        return new VisibilityMap([Rev.CXX98, Rev.CXX11, Rev.CXX14, Rev.CXX17]);
-    }
-
-    function get_visibility_map_c(el) {
-        // DIFF: 0, C89: 1, C99: 2, C11: 3
-        if (el.hasClass('t-since-c11')) {
-            return new VisibilityMap([Rev.C11]);
-        }
-        if (el.hasClass('t-since-c99')) {
-            if (el.hasClass('t-until-c11')) {
-                return new VisibilityMap([Rev.C99]);
+        for (; i < rev_css_classes.length; i++) {
+            if (el.hasClass(rev_css_classes[i].until)) {
+                break;
             }
-            return new VisibilityMap([Rev.C99, Rev.C11]);
+            map.add(rev_css_classes[i].rev);
         }
-        if (el.hasClass('t-until-c99')) {
-            return new VisibilityMap([Rev.C89]);
-        }
-        if (el.hasClass('t-until-c11')) {
-            return new VisibilityMap([Rev.C89, Rev.C99]);
-        }
-        return new VisibilityMap([Rev.C89, Rev.C99, Rev.C11]);
-    }
-
-    var get_mark, get_visibility_map;
-
-    if (is_cxx) {   // select either C or C++ version
-        get_mark = get_mark_cxx;
-        get_visibility_map = get_visibility_map_cxx;
-    } else {
-        get_mark = get_mark_c;
-        get_visibility_map = get_visibility_map_c;
+        return map;
     }
 
     /** This class keeps track of objects that need to be shown or hidden for
@@ -778,8 +718,9 @@ $(function() {
                     // template by chance
                     marks = $(this).find('.t-mark-rev');
                     if (marks.length > 0) {
-                        var mark = get_mark(marks.first());
-                        if (!should_be_shown(rev, mark)) {
+                        var visible = get_visibility_map(marks.first());
+                        visible.add(Rev.DIFF);
+                        if (!visible.is_visible_on(rev)) {
                             $(this).remove();
                         } else {
                             marks.remove(); // do not show marks in any case
@@ -1150,7 +1091,7 @@ $(function() {
             // process the member dcls
             el.children('.t-dcl').each(function() {
                 var new_id = process_tr($(this), has_num, has_revs,
-                                        new_def.revs.slice());
+                                        new_def.revs.clone());
                 new_def.children.push(new_id);
             });
 
@@ -1663,8 +1604,9 @@ $(function() {
         marks.each(function(index) {
             var mark_span = $(this).children('.t-mark-rev');
             if (mark_span.length > 0) {
-                var mark = get_mark(mark_span.first());
-                if (!should_be_shown(rev, mark)) {
+                var visible = get_visibility_map(mark_span.first());
+                visible.add(Rev.DIFF);
+                if (!visible.is_visible_on(rev)) {
                     titles.eq(index).remove();
                     $(this).remove();
                     num_deleted++;
