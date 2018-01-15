@@ -19,13 +19,30 @@
 
 $(function() {
 
-    var debug = false;
 
     // Add console.log() if not present
     if (!window.console)
         window.console = {};
     if (!window.console.log)
         window.console.log = function() { };
+
+    var get_url_parameter = function(name) {
+        var url = decodeURIComponent(window.location.search.substring(1));
+        var params = url.split('&');
+
+        for (i = 0; i < params.length; i++) {
+            var param = params[i].split('=');
+
+            if (param[0] === name) {
+                return param[1] === undefined ? true : param[1];
+            }
+        }
+        return null;
+    };
+
+    var debug = false;
+    if (get_url_parameter('stdrev_debug') !== null)
+        debug = true;
 
     // Returns true if the given arrays have the same length and equal elements
     // at specific positions, false otherwise
@@ -353,9 +370,9 @@ $(function() {
         too.
 
         In the context of this class, visual objects can be of one of the
-        following four kinds: primary, secondary, unknown and container. A
-        visual object is a certain DOM node in the tree. Section boundaries
-        and hierarchy has no relation to the DOM hierarchy.
+        following four kinds: primary, secondary, heading, unknown and
+        container. A visual object is a certain DOM node in the tree. Section
+        boundaries and hierarchy has no relation to the DOM hierarchy.
 
             Primary
 
@@ -369,8 +386,17 @@ $(function() {
 
             Secondary
 
-        Secondary objects don't affect the visibility of sections. Secondary
-        objects do not contain other objects.
+        Secondary objects don't affect the visibility of sections if there are
+        primary on unknown elements in it. If the section contains only
+        secondary elements, it is are hidden if all secondary elements are
+        hidden.
+
+        Secondary objects do not contain other objects.
+
+            Heading
+
+        Heading elements never affect the visibility of sections. All other
+        elements in the section are hidden, headings are hidden too.
 
             Container
 
@@ -406,9 +432,10 @@ $(function() {
     var ObjectType = {
         PRIMARY : 0,
         SECONDARY : 1,
-        UNKNOWN : 2,
-        SECTION : 3,
-        CONTAINER : 4
+        HEADING : 2,
+        UNKNOWN : 3,
+        SECTION : 4,
+        CONTAINER : 5
     };
 
     // internal classes for SectionContentsTracker
@@ -490,8 +517,13 @@ $(function() {
     };
 
     // Adds a secondary object to the current section and container
-    SectionContentsTracker.prototype.add_secondary = function(obj) {
-        this.add_object(obj, ObjectType.SECONDARY, null);
+    SectionContentsTracker.prototype.add_secondary = function(obj, visible) {
+        this.add_object(obj, ObjectType.SECONDARY, visible);
+    };
+
+    // Adds a heading object to the current section and container
+    SectionContentsTracker.prototype.add_heading = function(obj) {
+        this.add_object(obj, ObjectType.HEADING, null);
     };
 
     // Adds an unknown object to the current section and container
@@ -515,25 +547,46 @@ $(function() {
     // Recursively evaluates visibility of a section object
     SectionContentsTracker.prototype.eval_section_visibility = function(obj) {
         var visible = new VisibilityMap();
+        var secondary_visible = new VisibilityMap();
         var i, child;
+        var has_non_secondary = false;
+
         for (i = 0; i < obj.children.length; i++) {
             child = obj.children[i];
             switch (child.type) {
             case ObjectType.PRIMARY:
             case ObjectType.UNKNOWN:
                 visible.combine_or(child.visible);
+                has_non_secondary = true;
                 break;
-            case ObjectType.SECONDARY: // ignoring secondary objects
+            case ObjectType.SECONDARY:
+                secondary_visible.combine_or(child.visible);
+                break;
+            case ObjectType.HEADING:
                 break;
             case ObjectType.SECTION:
                 visible.combine_or(this.eval_section_visibility(child));
+                has_non_secondary = true;
                 break;
             }
         }
 
+        if (has_non_secondary) {
+            // Apply the resolved visibility to secondary children elements, if any
+            for (i = 0; i < obj.children.length; i++) {
+                child = obj.children[i];
+                if (child.type === ObjectType.SECONDARY) {
+                    child.visible = visible;
+                }
+            }
+        } else {
+            visible = secondary_visible;
+        }
+
+        // Apply the resolved visibility to heading children elements, if any
         for (i = 0; i < obj.children.length; i++) {
             child = obj.children[i];
-            if (child.type === ObjectType.SECONDARY) {
+            if (child.type === ObjectType.HEADING) {
                 child.visible = visible;
             }
         }
@@ -572,8 +625,8 @@ $(function() {
         return visible_mask;
     };
 
-    // Recursively evaluates the contents of a container and hides container
-    // and secondary elements if needed. visible_mask identifies which
+    // Recursively evaluates the contents of a container and hides container,
+    // heading and secondary elements if needed. visible_mask identifies which
     // revisions the object may be visible in certain revision (it may not be
     // visible in case parent container is not visible).
     SectionContentsTracker.prototype.perform_hide = function(obj, tracker, visible_mask) {
@@ -590,10 +643,68 @@ $(function() {
                 this.perform_hide(child, tracker, visible_mask);
                 break;
             case ObjectType.SECONDARY:
+            case ObjectType.HEADING:
                 this.perform_hide_obj(child, tracker, visible_mask);
                 break;
             }
         }
+    };
+
+    SectionContentsTracker.prototype.debug_obj_impl =
+            function(obj, desc, level) {
+        // note that obj.level only considers section hierarchy. When printing
+        // container hierarchy the depth level will be different and must be
+        // calculated explicitly
+        var indent = ' '.repeat(level);
+        var tag = '';
+        if (obj.obj !== null)
+            tag = obj.obj.prop("tagName");
+
+        return indent + desc + ' ' + tag + '\n';
+    };
+
+    SectionContentsTracker.prototype.debug_obj = function(obj, level) {
+        switch (obj.type) {
+        case ObjectType.PRIMARY:
+            return this.debug_obj_impl(obj, 'primary object', level);
+        case ObjectType.SECONDARY:
+            return this.debug_obj_impl(obj, 'secondary object', level);
+        case ObjectType.UNKNOWN:
+            return this.debug_obj_impl(obj, 'unknown object', level);
+        case ObjectType.HEADING:
+            return this.debug_obj_impl(obj, 'heading object', level);
+        }
+        return '';
+    };
+
+    SectionContentsTracker.prototype.debug_section_obj = function(obj, level) {
+        if (obj.type === ObjectType.SECTION) {
+            var out = this.debug_obj_impl(obj, 'section', level);
+            for (var i = 0; i < obj.children.length; ++i) {
+                out += this.debug_section_obj(obj.children[i], level+1);
+            }
+            return out;
+        }
+        return this.debug_obj(obj, level);
+    };
+
+    SectionContentsTracker.prototype.debug_container_obj = function(obj, level) {
+        if (obj.type === ObjectType.CONTAINER) {
+            var out = this.debug_obj_impl(obj, 'container', level);
+            for (var i = 0; i < obj.children.length; ++i) {
+                out += this.debug_container_obj(obj.children[i], level+1);
+            }
+            return out;
+        }
+        return this.debug_obj(obj, level);
+    };
+
+    SectionContentsTracker.prototype.debug_all = function() {
+        var out = 'Section hierarchy:\n\n';
+        out += this.debug_section_obj(this.root_section, 0);
+        out += '\nContainer hierarchy:\n\n';
+        out += this.debug_container_obj(this.root_container, 0);
+        return out;
     };
 
     SectionContentsTracker.prototype.run = function(tracker) {
@@ -602,6 +713,10 @@ $(function() {
         this.eval_container_visibility(this.root_container);
 
         this.perform_hide(this.root_container, tracker, visibility_fill(true));
+
+        if (debug) {
+            alert(this.debug_all());
+        }
     };
 
     /*  Used to aggregate a set of objects that need to be versioned. The set
@@ -625,7 +740,6 @@ $(function() {
         scope.nv = scope.root.find('.t-navbar');
         scope.dcl_tables = scope.root.find('.t-dcl-begin');
         scope.dcl_rev_tables = scope.dcl_tables.filter('.t-dcl-rev-begin');
-        scope.dsc_tables = scope.root.find('.t-dsc-begin');
         scope.rev_tables = scope.root.find('.t-rev-begin');
         scope.rev_inl_tables = scope.root.find('.t-rev-inl');
         scope.list_items = scope.root.find('.t-li1');
@@ -660,7 +774,6 @@ $(function() {
         Scope.split_scope(parent, scope, 'nv');
         Scope.split_scope(parent, scope, 'dcl_tables');
         Scope.split_scope(parent, scope, 'dcl_rev_tables');
-        Scope.split_scope(parent, scope, 'dsc_tables');
         Scope.split_scope(parent, scope, 'rev_tables');
         Scope.split_scope(parent, scope, 'rev_inl_tables');
         Scope.split_scope(parent, scope, 'list_items');
@@ -770,7 +883,7 @@ $(function() {
         }
     };
 
-    /*  Handles inclusions of Template:rev_begin, Template:rev and
+    /*  Handles inclusion of Template:rev_begin, Template:rev and
         Template:rev_end.
 
         We don't copy the contents of this templates around. We just add the
@@ -778,15 +891,29 @@ $(function() {
         the frame on non-diff revisions, we have special treatment in
         on_selection_change. Note, that in order for this to work, the revision
         marks must not be touched.
+
+        The visibility map of whole table is stored as 'visible' data member
+        of the jquery element.
     */
-    StandardRevisionPlugin.prototype.prepare_all_revs = function(scope) {
-        var rev_elems = scope.rev_tables.children('tbody').children('.t-rev');
+    StandardRevisionPlugin.prototype.prepare_rev = function(el) {
+        var rev_elems = el.children('tbody').children('.t-rev');
         var self = this;
+        var table_visible = new VisibilityMap();
+
         rev_elems.each(function() {
             var visible = get_visibility_map($(this));
             visible.add(Rev.DIFF);
+            table_visible.combine_or(visible);
 
             self.tracker.add_diff_object($(this), visible);
+        });
+        el.data('visible', table_visible);
+    };
+
+    StandardRevisionPlugin.prototype.prepare_all_revs = function(scope) {
+        var self = this;
+        scope.rev_tables.each(function() {
+            self.prepare_rev($(this));
         });
     };
 
@@ -805,24 +932,21 @@ $(function() {
         });
     };
 
-    /*  Handles the description lists and their contents - inclusions of
-        Template:dsc_* ('t-dsc-*' CSS classes)
-
-        Prepares items in dsc lists
-    */
-    StandardRevisionPlugin.prototype.prepare_all_dscs = function(scope) {
-        var self = this;
-        scope.dsc_tables.each(function() {
-            self.prepare_dsc_table($(this));
-        });
-    };
-
     // Returns true if the given jQuery object defines a secondary visual object
     StandardRevisionPlugin.prototype.is_secondary = function(el) {
+        if (el.is('p') ||
+            el.is('.t-rev-begin'))
+        {
+            return true;
+        }
+        return false;
+    };
+
+    // Returns true if the given jQuery object defines a heading visual object
+    StandardRevisionPlugin.prototype.is_heading = function(el) {
         if (el.is('h2') ||
             el.is('h3') ||
             el.is('h5') ||
-            el.is('p') ||
             (el.is('tr') && el.has('td > h5').length) ||
             el.is('.t-dsc-header'))
         {
@@ -861,24 +985,43 @@ $(function() {
         }
     };
 
-    // Handles a description list
-    StandardRevisionPlugin.prototype.prepare_dsc_table = function(el) {
+    /*  Handles the section hierarchy in a scope as defined by description
+        lists and their contents. Description lists are inclusions of
+        Template:dsc_* ('t-dsc-*' CSS classes).
+        See the documentation of SectionContentsTracker for more information.
+
+        Also prepares items in dsc lists
+    */
+    StandardRevisionPlugin.prototype.prepare_sections_and_dscs = function(scope) {
+        var self = this;
+
         var section_tracker = new SectionContentsTracker();
 
-        var start_el = el;
-        while (true) {
-            var prev = start_el.prev();
-            if (prev.length === 0 || !this.is_secondary(prev))
-                break;
-            start_el = prev;
-        }
+        scope.root.children().each(function(){
+            var el = $(this);
+            if (el.hasClass('t-dsc-begin')) {
+                // currently this is the only element that may contain primary
+                // elements. Note that the set of primary elements may be
+                // expanded in the future.
+                self.prepare_dsc_table(section_tracker, el);
+            } else if (self.is_secondary(el)) {
+                if (el.is('.t-rev-begin')) {
+                    section_tracker.add_secondary(el, el.data('visible'));
+                } else {
+                    section_tracker.add_secondary(el, visibility_fill(true));
+                }
+            } else if (self.is_heading(el)) {
+                self.set_level_if_needed(section_tracker, el);
+                section_tracker.add_heading(el);
+            } else {
+                section_tracker.add_unknown(el);
+            }
+        });
+        section_tracker.run(this.tracker);
+    };
 
-        while (start_el[0] !== el[0]) {
-            this.set_level_if_needed(section_tracker, start_el);
-            section_tracker.add_secondary(start_el);
-            start_el = start_el.next();
-        }
-
+    // Handles a description list
+    StandardRevisionPlugin.prototype.prepare_dsc_table = function(section_tracker, el) {
         section_tracker.enter_container(el);
 
         var rows = el.children('tbody').children();
@@ -887,17 +1030,16 @@ $(function() {
             var el = $(this);
             if (el.is('.t-dsc')) {
                 section_tracker.add_primary(el, self.prepare_dsc(el));
-            } else {
+            } else if (self.is_secondary(el)) {
+                section_tracker.add_secondary(el, visibility_fill(true));
+            } else if (self.is_heading(el)) {
                 self.set_level_if_needed(section_tracker, el);
-                if (self.is_secondary(el)) {
-                    section_tracker.add_secondary(el);
-                } else {
-                    section_tracker.add_unknown(el);
-                }
+                section_tracker.add_heading(el);
+            } else {
+                section_tracker.add_unknown(el);
             }
         });
         section_tracker.exit_container();
-        section_tracker.run(this.tracker);
     };
 
     /*  Handles one description list item (inclusion of Template:dsc_*,
@@ -1413,7 +1555,7 @@ $(function() {
 
             var disp_desc = [];
             var prev_nums = nums;
-            var prev_revs = [ Rev.DIFF ];
+            var prev_visible = new VisibilityMap([Rev.DIFF]);
 
             for (var rev = Rev.FIRST; rev !== Rev.LAST; ++rev) {
                 var target_nums = [];
@@ -1433,14 +1575,14 @@ $(function() {
                 }
 
                 if (array_equal(target_nums, prev_nums)) {
-                    prev_revs.push(rev);
+                    prev_visible.add(rev);
                 } else {
-                    disp_desc.push({ revs: prev_revs, nums: prev_nums });
-                    prev_revs = [rev];
+                    disp_desc.push({ visible: prev_visible, nums: prev_nums });
+                    prev_visible = new VisibilityMap([rev]);
                     prev_nums = target_nums;
                 }
             }
-            disp_desc.push({ revs: prev_revs, nums: prev_nums });
+            disp_desc.push({ visible: prev_visible, nums: prev_nums });
             // hide entire t-liX element if needed
             if (!visible.is_visible_on_all()) {
                 this.tracker.add_diff_object(descs[i].obj, visible);
@@ -1449,7 +1591,7 @@ $(function() {
             // Add t-li elements with different text if needed
             // the first item always includes Rev.DIFF in .revs
             if (disp_desc.length > 1) {
-                this.tracker.add_diff_object(descs[i].obj_num, disp_desc[0].revs);
+                this.tracker.add_diff_object(descs[i].obj_num, disp_desc[0].visible);
                 for (var j = 1; j < disp_desc.length; ++j) {
                     var new_el = descs[i].obj_num.clone().hide()
                                         .insertAfter(descs[i].obj_num);
@@ -1459,7 +1601,7 @@ $(function() {
                         text = text + ',' + disp_desc[j].nums[k].toString();
                     }
                     new_el.text(text + ')');
-                    this.tracker.add_object(new_el, descs[i].obj_num, disp_desc[j].revs);
+                    this.tracker.add_object(new_el, descs[i].obj_num, disp_desc[j].visible);
                 }
             }
         }
@@ -1498,7 +1640,7 @@ $(function() {
             self.prepare_navbar(scope);
             self.prepare_all_revs(scope);
             self.prepare_all_inl_revs(scope);
-            self.prepare_all_dscs(scope);
+            self.prepare_sections_and_dscs(scope);
 
             if (scope.dcl_tables.length > 0) {
                 var num_map = self.prepare_all_dcls(scope.dcl_tables.first());
@@ -1584,9 +1726,7 @@ $(function() {
     StandardRevisionPlugin.prototype.revision_map_to_visibility = function(revs) {
         var visible = new VisibilityMap();
         for (var i = 0; i < revs.length; ++i) {
-            for (var j = 0; j < revs[i].length; ++j) {
-                visible.add(revs[i][j]);
-            }
+            visible.combine_or(revs[i]);
         }
         return visible;
     };
@@ -1654,7 +1794,9 @@ $(function() {
         var rev = parseInt(this.select.val());
         this.tracker.to_rev(rev);
 
-        // special treatment for rev boxes
+        // special treatment for rev boxes. Since these containers are very
+        // simple, we can apply a CSS class to hide the border and rev markers
+        // on non-diff revision.
         if (this.curr_rev === Rev.DIFF && rev !== Rev.DIFF) {
             this.for_all_scopes(function() {
                 this.rev_tables.each(function() {
