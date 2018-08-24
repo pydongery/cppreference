@@ -249,7 +249,7 @@ def preprocess_html_file(root, fn, rename_map):
     for el in html.xpath('//*'):
         if has_class(el, ['noprint', 'editsection']) and el.get('id') != 'cpp-footer-base':
             el.getparent().remove(el)
-        if el.get('id') == 'toc':
+        if el.get('id') in ['toc', 'catlinks']:
             el.getparent().remove(el)
 
     # remove external links to unused resources
