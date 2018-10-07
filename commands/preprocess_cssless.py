@@ -21,10 +21,12 @@ from lxml import html
 from lxml import etree
 from io import StringIO
 from lxml.etree import strip_elements
+import copy
+import functools
+import io
 import logging
 import os
 import warnings
-import io
 
 def preprocess_html_merge_cssless(src_path, dst_path):
     with open(src_path, 'r') as a_file:
@@ -46,8 +48,7 @@ def preprocess_html_merge_cssless(src_path, dst_path):
     os.makedirs(head, exist_ok=True)
 
     with open(dst_path, 'wb') as a_file:
-        root.getroottree().write(a_file, pretty_print=True, method="html",
-                                 encoding='utf-8')
+        root.getroottree().write(a_file, pretty_print=True, method="html", encoding='utf-8')
     return output
 
 def silence_cssutils_warnings():
@@ -87,29 +88,49 @@ def needs_td_wrapper(element):
             return False
     return True
 
-def remove_css_property(element, property_name):
-    atrib = cssutils.parseStyle(element.get('style'))
-    atrib.removeProperty(property_name)
-    element.set('style', atrib.getCssText(separator=''))
-    if len(element.get('style')) == 0:
-        element.attrib.pop('style')
+@functools.lru_cache(maxsize=None)
+def cssutils_parse_style_cached_nocopy(style):
+    return cssutils.parseStyle(style)
 
+def cssutils_parse_style_cached(style):
+    return copy.deepcopy(cssutils_parse_style_cached_nocopy(style))
 
-def get_css_property_value(el, prop_name):
-    atrib = cssutils.parseStyle(el.get('style'))
+@functools.lru_cache(maxsize=None)
+def get_css_style_property_value(style, prop_name):
+    atrib = cssutils_parse_style_cached_nocopy(style)
     value = atrib.getPropertyCSSValue(prop_name)
     if value:
         return value.cssText
     return None
 
-def has_css_property_value(el, prop_name, prop_value):
-    value = get_css_property_value(el, prop_name)
+@functools.lru_cache(maxsize=None)
+def has_css_style_property_value(style, prop_name, prop_value):
+    value = get_css_style_property_value(style, prop_name)
     if value and value == prop_value:
         return True
     return False
 
+@functools.lru_cache(maxsize=None)
+def remove_css_style_property(style, property_name):
+    atrib = cssutils_parse_style_cached(style)
+    atrib.removeProperty(property_name)
+    return atrib.getCssText(separator='')
+
+def remove_css_property(element, property_name):
+    new_style = remove_css_style_property(element.get('style'), property_name)
+    if len(new_style) > 0:
+        element.set('style', new_style)
+    elif 'style' in element.attrib:
+        element.attrib.pop('style')
+
+def get_css_property_value(el, prop_name):
+    return get_css_style_property_value(el.get('style'), prop_name)
+
+def has_css_property_value(el, prop_name, prop_value):
+    return has_css_style_property_value(el.get('style'), prop_name, prop_value)
+
 def set_css_property_value(el, prop_name, prop_value):
-    atrib = cssutils.parseStyle(el.get('style'))
+    atrib = cssutils_parse_style_cached(el.get('style'))
     atrib.setProperty(prop_name, prop_value)
     el.set('style', atrib.getCssText(separator=''))
 
@@ -127,8 +148,7 @@ def convert_span_table_to_tr_td(table_el):
     remove_css_property(table_el, 'display')
 
     for element in table_el.getchildren():
-        tag_renamed = convert_display_property_to_html_tag(element, 'tr',
-                                                           'table-row')
+        tag_renamed = convert_display_property_to_html_tag(element, 'tr', 'table-row')
         if tag_renamed:
             if needs_td_wrapper(element):
                 td = etree.Element('td')
@@ -140,8 +160,7 @@ def convert_span_table_to_tr_td(table_el):
                 element.text = None
             else:
                 for child in element:
-                    convert_display_property_to_html_tag(child, 'td',
-                                                         'table-cell')
+                    convert_display_property_to_html_tag(child, 'td', 'table-cell')
 
 def wrap_element(el, tag_name, style):
     new_el = etree.Element(tag_name)
@@ -155,7 +174,6 @@ def remove_display_none(root_el):
             el.getparent().remove(el)
 
 def convert_span_tables_to_tr_td(root_el):
-
     # note that the following xpath expressions match only the prefix of the
     # CSS property value
     table_els = root_el.xpath('//span[contains(@style, "display:table")]')
@@ -248,7 +266,6 @@ def convert_table_border_top_to_tr_background(root_el):
                 border_td.set('style', 'height:1px; font-size:1px; '
                                        'background-color: #ccc;')
                 tr_el.addprevious(border_tr)
-
 
 def convert_zero_td_width_to_nonzero(root_el):
     for el in root_el.xpath('//*[contains(@style, "width")]'):

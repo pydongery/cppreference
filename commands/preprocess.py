@@ -19,6 +19,7 @@
 
 from datetime import datetime
 import fnmatch
+import io
 from lxml import etree
 import re
 import os
@@ -118,7 +119,7 @@ def find_files_to_be_renamed(root):
                                 # consistent and short file names because we
                                 # modify some of them later in the pipeline
 
-    for dir, dirnames, filenames in os.walk(root):
+    for dir, _, filenames in os.walk(root):
         filenames_loader = set(fnmatch.filter(filenames, 'load.php[?]*'))
         # match any filenames with '?"*' characters
         filenames_rename = set(fnmatch.filter(filenames, '*[?"*]*'))
@@ -131,7 +132,7 @@ def find_files_to_be_renamed(root):
         for fn in filenames_rename:
             files_rename.append((dir, fn))
 
-    for dir,orig_fn in files_rename:
+    for dir, orig_fn in files_rename:
         fn = orig_fn
         fn = re.sub(r'\?.*', '', fn)
         fn = fn.replace('"', '_q_')
@@ -139,7 +140,7 @@ def find_files_to_be_renamed(root):
         add_file_to_rename_map(rename_map, dir, orig_fn, fn)
 
     # map loader names to more recognizable names
-    for dir,fn in files_loader:
+    for dir, fn in files_loader:
         new_fn = convert_loader_name(fn)
         add_file_to_rename_map(rename_map, dir, fn, new_fn)
 
@@ -159,7 +160,7 @@ def rename_files(rename_map):
 def find_html_files(root):
     # find files that need to be preprocessed
     html_files = []
-    for dir, dirnames, filenames in os.walk(root):
+    for dir, _, filenames in os.walk(root):
         for filename in fnmatch.filter(filenames, '*.html'):
             html_files.append(os.path.join(dir, filename))
     return html_files
@@ -206,7 +207,7 @@ def is_external_link(target):
 
 def trasform_relative_link(rename_map, target):
     target = urllib.parse.unquote(target)
-    for dir,fn,new_fn in rename_map:
+    for _, fn, new_fn in rename_map:
         target = target.replace(fn, new_fn)
     target = target.replace('../../upload.cppreference.com/mwiki/','../common/')
     target = target.replace('../mwiki/','../common/')
@@ -231,7 +232,7 @@ def transform_link(rename_map, target, file, root):
 
     return trasform_relative_link(rename_map, target)
 
-def has_class(el, classes_to_check):
+def has_class(el, *classes_to_check):
     value = el.get('class')
     if value is None:
         return False
@@ -241,16 +242,75 @@ def has_class(el, classes_to_check):
             return True
     return False
 
+# remove non-printable elements
+def remove_noprint(html):
+    for el in html.xpath('//*'):
+        if has_class(el, 'noprint', 'editsection') and el.get('id') != 'cpp-footer-base':
+            el.getparent().remove(el)
+        elif el.get('id') in ['toc', 'catlinks']:
+            el.getparent().remove(el)
+
+# remove see also links between C and C++ documentations
+def remove_see_also(html):
+    for el in html.xpath('//tr[@class]'):
+        if not has_class(el, 't-dcl-list-item'):
+            continue
+
+        child_tds = el.xpath('.//td/div[@class]')
+        if not any(has_class(td, 't-dcl-list-see') for td in child_tds):
+            continue
+
+        # remove preceding separator, if any
+        prev = el.getprevious()
+        if prev is not None:
+            child_tds = prev.xpath('.//td[@class')
+            if any(has_class(td, 't-dcl-list-sep') for td in child_tds):
+                prev.getparent().remove(prev)
+
+        el.getparent().remove(el)
+
+    for el in html.xpath('//h3'):
+        if len(el.xpath(".//span[@id = 'See_also']")) == 0:
+            continue
+
+        next = el.getnext()
+        if next is None:
+            el.getparent().remove(el)
+            continue
+
+        if next.tag != 'table':
+            continue
+
+        if not has_class(next, 't-dcl-list-begin'):
+            continue
+
+        if len(next.xpath('.//tr')) > 0:
+            continue
+
+        el.getparent().remove(el)
+        next.getparent().remove(next)
+
+# remove Google Analytics scripts
+def remove_google_analytics(html):
+    for el in html.xpath('/html/body/script'):
+        if el.get('src') is not None and 'google-analytics.com/ga.js' in el.get('src'):
+            el.getparent().remove(el)
+        elif el.text is not None and ('google-analytics.com/ga.js' in el.text or 'pageTracker' in el.text):
+            el.getparent().remove(el)
+
+# remove Carbon ads
+def remove_ads(html):
+    for el in html.xpath('//script[@src]'):
+        if 'carbonads.com/carbon.js' in el.get('src'):
+            el.getparent().remove(el)
+    for el in html.xpath('/html/body/style'):
+        if el.text is not None and '#carbonads' in el.text:
+            el.getparent().remove(el)
+
 def preprocess_html_file(root, fn, rename_map):
     parser = etree.HTMLParser()
     html = etree.parse(fn, parser)
-
-    # remove non-printable elements
-    for el in html.xpath('//*'):
-        if has_class(el, ['noprint', 'editsection']) and el.get('id') != 'cpp-footer-base':
-            el.getparent().remove(el)
-        if el.get('id') in ['toc', 'catlinks']:
-            el.getparent().remove(el)
+    output = io.StringIO()
 
     # remove external links to unused resources
     for el in html.xpath('/html/head/link'):
@@ -260,12 +320,10 @@ def preprocess_html_file(root, fn, rename_map):
             (head, tail) = os.path.split(el.get('href'))
             el.set('href', os.path.join(head, 'common', tail))
 
-    # remove Google Analytics scripts
-    for el in html.xpath('/html/body/script'):
-        if el.get('src') is not None and 'google-analytics.com/ga.js' in el.get('src'):
-            el.getparent().remove(el)
-        elif el.text is not None and ('google-analytics.com/ga.js' in el.text or 'pageTracker' in el.text):
-            el.getparent().remove(el)
+    remove_noprint(html)
+    remove_see_also(html)
+    remove_google_analytics(html)
+    remove_ads(html)
 
     # make custom footer
     footer = html.xpath('//*[@id=\'footer\']')[0]
@@ -282,7 +340,7 @@ def preprocess_html_file(root, fn, rename_map):
             link.text = 'Online version'
 
             li = etree.SubElement(items, 'li')
-            mtime = datetime.fromtimestamp(os.stat(fn).st_mtime);
+            mtime = datetime.fromtimestamp(os.stat(fn).st_mtime)
             li.text = f"Offline version retrieved {mtime.isoformat(sep=' ', timespec='minutes')}."
         elif id == 'footer-info':
             pass
@@ -297,9 +355,10 @@ def preprocess_html_file(root, fn, rename_map):
             el.set('href', transform_link(rename_map, el.get('href'), fn, root))
 
     for err in parser.error_log:
-        print("HTML WARN: {0}".format(err))
+        print("HTML WARN: {0}".format(err), file=output)
 
     html.write(fn, encoding='utf-8', method='html')
+    return output.getvalue()
 
 def preprocess_css_file(fn):
     f = open(fn, "r", encoding='utf-8')
