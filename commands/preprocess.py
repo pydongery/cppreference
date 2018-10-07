@@ -243,9 +243,9 @@ def has_class(el, *classes_to_check):
     return False
 
 # remove non-printable elements
-def remove_noprint(html):
+def remove_noprint(html, keep_footer=False):
     for el in html.xpath('//*'):
-        if has_class(el, 'noprint', 'editsection') and el.get('id') != 'cpp-footer-base':
+        if has_class(el, 'noprint', 'editsection') and not (keep_footer and el.get('id') == 'cpp-footer-base'):
             el.getparent().remove(el)
         elif el.get('id') in ['toc', 'catlinks']:
             el.getparent().remove(el)
@@ -350,7 +350,7 @@ def preprocess_html_file(root, fn, rename_map):
             (head, tail) = os.path.split(el.get('href'))
             el.set('href', os.path.join(head, 'common', tail))
 
-    remove_noprint(html)
+    remove_noprint(html, keep_footer=True)
     remove_see_also(html)
     remove_google_analytics(html)
     remove_ads(html)
