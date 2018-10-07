@@ -307,6 +307,13 @@ def remove_ads(html):
         if el.text is not None and '#carbonads' in el.text:
             el.getparent().remove(el)
 
+# remove links to file info pages (e.g. on images)
+def remove_fileinfo(html):
+    info = etree.XPath(r"//a[re:test(@href, 'https?://[a-z]+\.cppreference\.com/w/File:')]/..",
+        namespaces={'re':'http://exslt.org/regular-expressions'})
+    for el in info(html):
+        el.getparent().remove(el)
+
 # make custom footer
 def add_footer(html, root, fn):
     footer = html.xpath('//*[@id=\'footer\']')[0]
@@ -347,15 +354,15 @@ def preprocess_html_file(root, fn, rename_map):
     remove_see_also(html)
     remove_google_analytics(html)
     remove_ads(html)
+    remove_fileinfo(html)
 
     add_footer(html, root, fn)
 
     # apply changes to links caused by file renames
-    for el in html.xpath('//*[@src or @href]'):
-        if el.get('src') is not None:
-            el.set('src', transform_link(rename_map, el.get('src'), fn, root))
-        elif el.get('href') is not None:
-            el.set('href', transform_link(rename_map, el.get('href'), fn, root))
+    for el in html.xpath('//*[@src]'):
+        el.set('src', transform_link(rename_map, el.get('src'), fn, root))
+    for el in html.xpath('//*[@href]'):
+        el.set('href', transform_link(rename_map, el.get('href'), fn, root))
 
     for err in parser.error_log:
         print("HTML WARN: {0}".format(err), file=output)
@@ -372,6 +379,8 @@ def preprocess_css_file(fn):
 
     text = text.replace('../DejaVuSansMonoCondensed60.ttf', 'DejaVuSansMonoCondensed60.ttf')
     text = text.replace('../DejaVuSansMonoCondensed75.ttf', 'DejaVuSansMonoCondensed75.ttf')
+
+    text = text.replace('../../upload.cppreference.com/mwiki/images/', 'images/')
 
     # QT Help viewer doesn't understand nth-child
     text = text.replace('nth-child(1)', 'first-child')
