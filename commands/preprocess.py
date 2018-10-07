@@ -317,7 +317,7 @@ def add_footer(html, root, fn):
             items.clear()
 
             link = etree.SubElement(etree.SubElement(items, 'li'), 'a')
-            url = re.sub(r'(..)/(.*)\.html', r'http://\1.cppreference.com/w/\2', os.path.relpath(fn, root))
+            url = re.sub(r'(..)/(.*)\.html', r'https://\1.cppreference.com/w/\2', os.path.relpath(fn, root))
             url = re.sub(r'(.*)/index', r'\1/', url)
             link.set('href', url)
             link.text = 'Online version'
