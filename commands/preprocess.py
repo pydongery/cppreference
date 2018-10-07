@@ -307,6 +307,29 @@ def remove_ads(html):
         if el.text is not None and '#carbonads' in el.text:
             el.getparent().remove(el)
 
+# make custom footer
+def add_footer(html, root, fn):
+    footer = html.xpath('//*[@id=\'footer\']')[0]
+    for child in footer.getchildren():
+        id = child.get('id')
+        if id == 'cpp-navigation':
+            items = child.find('ul')
+            items.clear()
+
+            link = etree.SubElement(etree.SubElement(items, 'li'), 'a')
+            url = re.sub(r'(..)/(.*)\.html', r'http://\1.cppreference.com/w/\2', os.path.relpath(fn, root))
+            url = re.sub(r'(.*)/index', r'\1/', url)
+            link.set('href', url)
+            link.text = 'Online version'
+
+            li = etree.SubElement(items, 'li')
+            mtime = datetime.fromtimestamp(os.stat(fn).st_mtime)
+            li.text = "Offline version retrieved {}.".format(mtime.isoformat(sep=' ', timespec='minutes'))
+        elif id == 'footer-info':
+            pass
+        else:
+            footer.remove(child)
+
 def preprocess_html_file(root, fn, rename_map):
     parser = etree.HTMLParser()
     html = etree.parse(fn, parser)
@@ -325,27 +348,7 @@ def preprocess_html_file(root, fn, rename_map):
     remove_google_analytics(html)
     remove_ads(html)
 
-    # make custom footer
-    footer = html.xpath('//*[@id=\'footer\']')[0]
-    for child in footer.getchildren():
-        id = child.get('id')
-        if id == 'cpp-navigation':
-            items = child.find('ul')
-            items.clear()
-
-            link = etree.SubElement(etree.SubElement(items, 'li'), 'a')
-            url = re.sub('(..)/(.*)\\.html', 'http://\\1.cppreference.com/w/\\2', os.path.relpath(fn, root))
-            url = re.sub('(.*)/index', '\\1/', url)
-            link.set('href', url)
-            link.text = 'Online version'
-
-            li = etree.SubElement(items, 'li')
-            mtime = datetime.fromtimestamp(os.stat(fn).st_mtime)
-            li.text = f"Offline version retrieved {mtime.isoformat(sep=' ', timespec='minutes')}."
-        elif id == 'footer-info':
-            pass
-        else:
-            footer.remove(child)
+    add_footer(html, root, fn)
 
     # apply changes to links caused by file renames
     for el in html.xpath('//*[@src or @href]'):
