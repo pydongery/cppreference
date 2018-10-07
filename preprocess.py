@@ -54,9 +54,6 @@ def main():
             if len(output) > 0:
                 print(output)
 
-    for fn in preprocess.find_html_files(root):
-        preprocess.preprocess_html_file(root, fn, rename_map)
-
     # append css modifications
 
     with open("preprocess-css.css", "r", encoding='utf-8') as pp, \
