@@ -253,17 +253,17 @@ def remove_noprint(html, keep_footer=False):
 # remove see also links between C and C++ documentations
 def remove_see_also(html):
     for el in html.xpath('//tr[@class]'):
-        if not has_class(el, 't-dcl-list-item'):
+        if not has_class(el, 't-dcl-list-item', 't-dsc'):
             continue
 
         child_tds = el.xpath('.//td/div[@class]')
-        if not any(has_class(td, 't-dcl-list-see') for td in child_tds):
+        if not any(has_class(td, 't-dcl-list-see', 't-dsc-see') for td in child_tds):
             continue
 
         # remove preceding separator, if any
         prev = el.getprevious()
         if prev is not None:
-            child_tds = prev.xpath('.//td[@class')
+            child_tds = prev.xpath('.//td[@class]')
             if any(has_class(td, 't-dcl-list-sep') for td in child_tds):
                 prev.getparent().remove(prev)
 
@@ -276,19 +276,9 @@ def remove_see_also(html):
         next = el.getnext()
         if next is None:
             el.getparent().remove(el)
-            continue
-
-        if next.tag != 'table':
-            continue
-
-        if not has_class(next, 't-dcl-list-begin'):
-            continue
-
-        if len(next.xpath('.//tr')) > 0:
-            continue
-
-        el.getparent().remove(el)
-        next.getparent().remove(next)
+        elif next.tag == 'table' and has_class(next, 't-dcl-list-begin') and len(next.xpath('.//tr')) == 0:
+            el.getparent().remove(el)
+            next.getparent().remove(next)
 
 # remove Google Analytics scripts
 def remove_google_analytics(html):
@@ -337,19 +327,21 @@ def add_footer(html, root, fn):
         else:
             footer.remove(child)
 
-def preprocess_html_file(root, fn, rename_map):
-    parser = etree.HTMLParser()
-    html = etree.parse(fn, parser)
-    output = io.StringIO()
-
-    # remove external links to unused resources
+# remove external links to unused resources
+def remove_unused_external(html):
     for el in html.xpath('/html/head/link'):
-        if el.get('rel') in [ 'alternate', 'search', 'edit', 'EditURI' ]:
+        if el.get('rel') in ('alternate', 'search', 'edit', 'EditURI'):
             el.getparent().remove(el)
         elif el.get('rel') == 'shortcut icon':
             (head, tail) = os.path.split(el.get('href'))
             el.set('href', os.path.join(head, 'common', tail))
 
+def preprocess_html_file(root, fn, rename_map):
+    parser = etree.HTMLParser()
+    html = etree.parse(fn, parser)
+    output = io.StringIO()
+
+    remove_unused_external(html)
     remove_noprint(html, keep_footer=True)
     remove_see_also(html)
     remove_google_analytics(html)
