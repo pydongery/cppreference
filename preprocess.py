@@ -23,10 +23,16 @@ import concurrent.futures
 import os
 import shutil
 
+
 def main():
     parser = argparse.ArgumentParser(prog='preprocess.py')
-    parser.add_argument('--src', type=str, help='Source directory where raw website copy resides')
-    parser.add_argument('--dst', type=str, help='Destination folder to put preprocessed archive to')
+    parser.add_argument(
+        '--src', type=str,
+        help='Source directory where raw website copy resides')
+
+    parser.add_argument(
+        '--dst', type=str,
+        help='Destination folder to put preprocessed archive to')
     args = parser.parse_args()
 
     root = args.dst
@@ -57,16 +63,19 @@ def main():
     # append css modifications
 
     with open("preprocess-css.css", "r", encoding='utf-8') as pp, \
-         open(os.path.join(root, 'common/site_modules.css'), "a", encoding='utf-8') as out:
+            open(os.path.join(root, 'common/site_modules.css'), "a",
+                 encoding='utf-8') as out:
         out.writelines(pp)
 
     # clean the css files
 
-    for fn in [ os.path.join(root, 'common/site_modules.css'),
-                os.path.join(root, 'common/ext.css') ]:
+    for fn in [os.path.join(root, 'common/site_modules.css'),
+               os.path.join(root, 'common/ext.css')]:
         preprocess.preprocess_css_file(fn)
 
-    preprocess.preprocess_startup_script(os.path.join(root, 'common/startup_scripts.js'))
+    preprocess.preprocess_startup_script(
+        os.path.join(root, 'common/startup_scripts.js'))
+
 
 if __name__ == "__main__":
     main()
