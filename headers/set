@@ -21,6 +21,7 @@
 #endif
 
 #include <cstddef> // for size_t, ptrdiff_t
+#include <functional> // for less
 #include <iterator> // for std::reverse_iterator
 #include <memory> // for std::allocator
 #include <utility> // for std::pair
@@ -56,22 +57,16 @@ public:
     typedef typename std::allocator_traits<Allocator>::pointer pointer;
     typedef typename std::allocator_traits<Allocator>::const_pointer const_pointer;
 #endif
-    typedef T* iterator; // actual type is unspecified
-    typedef const T* const_iterator; // actual type is unspecified
+    typedef Key* iterator; // actual type is unspecified
+    typedef const Key* const_iterator; // actual type is unspecified
     typedef std::reverse_iterator<iterator> reverse_iterator;
     typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
 
     // constructor
 
-
-#if CPPREFERENCE_STDVER <2014
-    explicit set(const Compare& comp = Compare(),
-                 const Allocator& alloc = Allocator());
-#else
     set();
     explicit set(const Compare& comp,
                  const Allocator& alloc = Allocator());
-#endif
 
 #if CPPREFERENCE_STDVER>= 2011
     explicit set(const Allocator& alloc);
@@ -175,8 +170,10 @@ public:
 
     // lookup
     size_type count(const Key& key) const;
+#if CPPREFERENCE_STDVER >= 2014
     template<class K>
     size_type count(const K& x) const;
+#endif
 
     iterator find(const Key& key);
     const_iterator find(const Key& key) const;
@@ -281,22 +278,16 @@ public:
     typedef typename std::allocator_traits<Allocator>::pointer pointer;
     typedef typename std::allocator_traits<Allocator>::const_pointer const_pointer;
 #endif
-    typedef T* iterator; // actual type is unspecified
-    typedef const T* const_iterator; // actual type is unspecified
+    typedef Key* iterator; // actual type is unspecified
+    typedef const Key* const_iterator; // actual type is unspecified
     typedef std::reverse_iterator<iterator> reverse_iterator;
     typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
 
     // constructor
 
-
-#if CPPREFERENCE_STDVER <2014
-    explicit multiset(const Compare& comp = Compare(),
-                      const Allocator& alloc = Allocator());
-#else
     multiset();
     explicit multiset(const Compare& comp,
                       const Allocator& alloc = Allocator());
-#endif
 
 #if CPPREFERENCE_STDVER>= 2011
     explicit multiset(const Allocator& alloc);
@@ -400,8 +391,10 @@ public:
 
     // lookup
     size_type count(const Key& key) const;
+#if CPPREFERENCE_STDVER >= 2014
     template<class K>
     size_type count(const K& x) const;
+#endif
 
     iterator find(const Key& key);
     const_iterator find(const Key& key) const;

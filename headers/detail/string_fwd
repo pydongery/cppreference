@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015  Povilas Kanapickas <povilas@radix.lt>
+/*  Copyright (C) 2019  Povilas Kanapickas <povilas@radix.lt>
 
     This file is part of cppreference-doc
 
@@ -13,38 +13,30 @@
     Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
 */
 
-#ifndef CPPREFERENCE_TYPEINFO_H
-#define CPPREFERENCE_TYPEINFO_H
+#ifndef CPPREFERENCE_DETAIL_STRING_FWD_H
+#define CPPREFERENCE_DETAIL_STRING_FWD_H
 
-#include <cstddef> // for size_t
-#include <exception>
+// this is non-standard header
 
 namespace std {
 
-class type_info {
-public:
-    virtual ~type_info();
+template<class CharT> struct char_traits;
 
-    bool operator==(const type_info& rhs) const;
-    bool operator!=(const type_info& rhs) const;
+template<class T> class allocator;
 
-    bool before(const type_info& rhs) const;
+template <
+    class CharT,
+    class Traits = std::char_traits<CharT>,
+    class Allocator = std::allocator<CharT>
+> class basic_string;
+
+typedef basic_string<char> string;
+typedef basic_string<wchar_t> wstring;
 #if CPPREFERENCE_STDVER>= 2011
-    size_t hash_code() const;
+typedef basic_string<char16_t> u16string;
+typedef basic_string<char32_t> u32string;
 #endif
-    const char* name() const;
-};
-
-class bad_cast : public exception {
-public:
-    bad_cast();
-};
-
-class bad_typeid : public exception {
-public:
-    bad_typeid();
-};
 
 } // namespace std
 
-#endif // CPPREFERENCE_TYPEINFO_H
+#endif // CPPREFERENCE_DETAIL_STRING_FWD_H

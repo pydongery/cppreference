@@ -18,16 +18,32 @@
 
 namespace std {
 
-struct va_list; // actually a typedef
+#ifdef va_start
+typedef ::va_list va_list;
+#else
+struct va_list {}; // actually a typedef
+#endif
 
 } // namespace std
 
-void va_start(std::va_list ap, int parm_n); // actually a macro
+#ifndef va_start
+template<class T>
+void va_start(std::va_list ap, T parm_n); // actually a macro
+#endif
+
+#ifndef va_arg
 #define va_arg(x, T) T()
+#endif
+
 #if CPPREFERENCE_STDVER>= 2011
+#ifndef va_copy
 void va_copy(std::va_list desc, std::va_list src); // actually a macro
 #endif
+#endif
+
+#ifndef va_end
 void va_end(std::va_list ap); // actually a macro
+#endif
 
 
 #endif // CPPREFERENCE_CSTDARG_H

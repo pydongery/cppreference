@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015  Povilas Kanapickas <povilas@radix.lt>
+/*  Copyright (C) 2019  Povilas Kanapickas <povilas@radix.lt>
 
     This file is part of cppreference-doc
 
@@ -13,38 +13,23 @@
     Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
 */
 
-#ifndef CPPREFERENCE_TYPEINFO_H
-#define CPPREFERENCE_TYPEINFO_H
+#ifndef CPPREFERENCE_DETAIL_CPPREFERENCE_UNSPECIFIED_H
+#define CPPREFERENCE_DETAIL_CPPREFERENCE_UNSPECIFIED_H
 
-#include <cstddef> // for size_t
-#include <exception>
+// this is non-standard header
 
 namespace std {
 
-class type_info {
-public:
-    virtual ~type_info();
-
-    bool operator==(const type_info& rhs) const;
-    bool operator!=(const type_info& rhs) const;
-
-    bool before(const type_info& rhs) const;
-#if CPPREFERENCE_STDVER>= 2011
-    size_t hash_code() const;
+#if CPPREFERENCE_STDVER >= 2011
+using CPPREFERENCE_UNSPECIFIED_TYPE = int;
+constexpr int CPPREFERENCE_UNSPECIFIED_TYPE_VALUE = 0;
+using CPPREFERENCE_SIMPLIFIED_TYPE = int;
+#else
+typedef int CPPREFERENCE_UNSPECIFIED_TYPE;
+static const int CPPREFERENCE_UNSPECIFIED_TYPE_VALUE = 0;
+typedef int CPPREFERENCE_SIMPLIFIED_TYPE;
 #endif
-    const char* name() const;
-};
-
-class bad_cast : public exception {
-public:
-    bad_cast();
-};
-
-class bad_typeid : public exception {
-public:
-    bad_typeid();
-};
 
 } // namespace std
 
-#endif // CPPREFERENCE_TYPEINFO_H
+#endif // CPPREFERENCE_DETAIL_LOCALE_FWD_H
