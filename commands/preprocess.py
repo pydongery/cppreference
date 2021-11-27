@@ -20,10 +20,11 @@
 from datetime import datetime
 import fnmatch
 import io
-import re
 import os
+import re
 import shutil
 import urllib.parse
+
 from lxml import etree
 
 
