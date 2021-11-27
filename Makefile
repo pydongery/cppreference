@@ -28,7 +28,7 @@ qhelpgenerator = qhelpgenerator
 
 #Version
 
-VERSION=20201016
+VERSION=20211127
 
 #STANDARD RULES
 
