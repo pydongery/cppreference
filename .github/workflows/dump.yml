@@ -3,6 +3,9 @@ name: Dump cppreference
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   generate:
     runs-on: ubuntu-latest
@@ -14,20 +17,27 @@ jobs:
 
     - name: Get current date
       id: date
-      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+      run: echo "{date}={$(date +'%Y%m%d%H%M')}" >> $GITHUB_STATE
 
     - name: Generate
-      run: make source && tar -Jcvf dump.tar.xz reference
+      run: |
+        mkdir -p release
+        make source && tar -Jcvf release/${{ env.date }}.tar.xz reference
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         path: "reference"
 
-    - name: Release
-      uses: softprops/action-gh-release@v2
+    - name: Deploy to raw dumps repo
+      uses: cpina/github-action-push-to-another-repository@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.GITHUB_TOKEN }}
       with:
-        make_latest: true
-        name: Raw dump ${{ steps.date.outputs.date }}
-        body: Raw dump of en.cppreference.com retrieved at ${{ steps.date.outputs.date }}
-        files: dump.tar.xz
+        source-directory: release
+        destination-github-username: pydongery
+        destination-repository-name: cppreference
+        user-email: noreply@pydong.org
+        user-name: cppreference bot
+        target-branch: raw_dumps
+        commit-message: Dumped at ${{ env.date }}
