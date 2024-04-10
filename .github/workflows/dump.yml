@@ -21,8 +21,8 @@ jobs:
 
     - name: Generate
       run: |
-        mkdir -p release
-        make source && tar -Jcvf release/${{ env.date }}.tar.xz reference
+        make source && tar -Jcvf dump.tar.xz reference
+        cp dump.tar.xz reference/dump.tar.xz
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -34,7 +34,7 @@ jobs:
       env:
         API_TOKEN_GITHUB: ${{ secrets.GITHUB_TOKEN }}
       with:
-        source-directory: release
+        source-directory: reference
         destination-github-username: pydongery
         destination-repository-name: cppreference
         user-email: noreply@pydong.org
