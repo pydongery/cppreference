@@ -12,15 +12,22 @@ jobs:
       with:
         submodules: true
 
+    - name: Get current date
+      id: date
+      run: echo "::set-output name=date::$(date +'%Y-%m-%d')"
+
     - name: Generate
       run: make source && tar -Jcvf dump.tar.xz reference
 
-    - name: Upload site artifact
-      uses: actions/upload-pages-artifact@v3
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
       with:
         path: "reference"
 
     - name: Release
       uses: softprops/action-gh-release@v2
       with:
+        make_latest: true
+        name: Raw dump ${{ steps.date.outputs.date }}
+        body: Raw dump of en.cppreference.com retrieved at ${{ steps.date.outputs.date }}
         files: dump.tar.xz
