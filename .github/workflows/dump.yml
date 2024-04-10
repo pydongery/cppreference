@@ -39,5 +39,5 @@ jobs:
         destination-repository-name: cppreference
         user-email: noreply@pydong.org
         user-name: cppreference bot
-        target-branch: raw_dumps
+        target-branch: raw_dump
         commit-message: Dumped at ${{ env.date }}
